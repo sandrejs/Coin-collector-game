@@ -1,0 +1,210 @@
+# This script implements a simple game using Pygame library
+# The game involves a player character collecting falling coins while avoiding monsters
+# I have divided game logic into different methods, making it easier to understand and maintain
+
+import pygame
+import random
+
+# Helper global variables
+game_start = True
+
+class CoinCollector:
+
+    def __init__(self):
+        pygame.init()
+        self.score = 0 
+        self.screen = pygame.display.set_mode((1280, 720))
+        self.screen_rect = self.screen.get_rect()
+
+        self.clock = pygame.time.Clock()
+        pygame.display.set_caption('Coin Collector')
+        self.monster_x_pos = 1400
+        self.monster_2_x_pos = 1400
+        self.player_gravity = -20
+        self.game_active = False
+        
+        self.coin_surfaces = []  
+        self.coin_rects = []  
+
+        self.game_name()
+
+        self.main_loop()
+
+    def main_loop(self):
+        while True:
+            self.check_events()
+            self.score_mes()
+            self.player()
+            self.monster()
+            self.coins()
+            self.movement()
+            self.controls()
+            self.collide()
+            self.draw_window()
+            
+    def check_events(self):
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                exit()
+
+    def draw_window(self):
+        if self.game_active:
+            self.screen.fill((220, 220, 220))
+            self.screen.blit(self.score_message, self.score_message_rect)
+            self.screen.blit(self.player_surface, self.player_rect)
+            self.screen.blit(self.monster_surface, self.monster_rect)
+            self.screen.blit(self.monster_surface_2, self.monster_2_rect)
+            for coin_surface, coin_rect in zip(self.coin_surfaces, self.coin_rects):
+                self.screen.blit(coin_surface, coin_rect)
+         
+        # Intro screen
+        else:
+            self.screen.fill((220, 220, 220))
+            self.screen.blit(self.player_intro, self.player_intro_rect)
+            self.screen.blit(self.game_name, self.game_name_rect)
+
+            if self.score == 0:
+                self.screen.blit(self.game_message, self.game_message_rect)
+            
+            else:
+                self.screen.blit(self.game_score, self.game_score_rect)
+
+        pygame.display.update()     
+        self.clock.tick(60)
+
+    def player(self):
+        self.player_surface = pygame.image.load('robot.png').convert_alpha()
+
+        if game_start == True :
+
+             self.player_rect = self.player_surface.get_rect(midbottom = (200,720))
+
+
+        # Size in the starting screen:
+        self.player_intro = pygame.transform.rotozoom(self.player_surface,0, 3)
+
+        # Position on starting screen
+        self.player_intro_rect = self.player_intro.get_rect(center = (640,320))
+
+
+    def monster(self):
+        # Small monster
+        self.monster_surface = pygame.image.load('monster.png').convert_alpha()
+        self.monster_rect = self.monster_surface.get_rect(midbottom = (self.monster_x_pos,720))
+        
+        # Big monster
+        self.monster_surface_2 = pygame.transform.rotozoom(self.monster_surface,0, 1.5)
+        self.monster_2_rect = self.monster_surface_2.get_rect(midbottom = (self.monster_2_x_pos,720))
+
+    def coins(self):
+        if self.game_active:
+
+            # Create a new coin at random x position when needed
+            if len(self.coin_rects) < 5 and random.randint(1, 50) == 1:
+                coin_surface = pygame.image.load('coin.png').convert_alpha()
+                coin_rect = coin_surface.get_rect()
+                coin_rect.x = random.randrange(0, self.screen_rect.right - 30)
+                coin_rect.y = 0
+                self.coin_surfaces.append(coin_surface)
+                self.coin_rects.append(coin_rect)
+
+            # Update positions of existing coins
+            for coin_rect in self.coin_rects:
+                coin_rect.y += 2  # Adjust the speed of falling coins
+
+                if coin_rect.top > self.screen_rect.bottom:
+                    coin_rect.y = 0
+
+    def starting_screen(self):
+        if self.monster_rect.colliderect(self.player_rect):
+            pygame.quit()
+            exit()
+
+    def collide(self):
+        if self.monster_rect.colliderect(self.player_rect) or self.monster_2_rect.colliderect(self.player_rect):
+            global game_start
+            game_start = True
+
+            self.game_active = False
+        
+        # Coin collision
+        for coin_rect in self.coin_rects:
+            if coin_rect.colliderect(self.player_rect):             
+                self.score += 1
+                self.coin_rects.remove(coin_rect)
+
+
+    def movement(self):
+        # Small monster
+        self.monster_x_pos -= 6
+        if self.monster_x_pos < -100: self.monster_x_pos = 1400
+
+        # Big monster
+        self.monster_2_x_pos -= 3
+        if self.monster_2_x_pos < -100: self.monster_2_x_pos = 1400
+
+        # Player gravity
+        self.player_gravity += 4
+        self.player_rect.y += self.player_gravity
+        if self.player_rect.bottom >= 720: 
+            self.player_rect.bottom = 720
+
+    def controls(self):
+        keys = pygame.key.get_pressed()
+
+        if self.game_active:
+            # Apply gravity continuously
+            self.player_gravity += 1  # Adjust the gravity value as needed
+            self.player_rect.y += self.player_gravity
+
+            # Prevent falling below the ground
+            if self.player_rect.bottom >= 720:
+                self.player_rect.bottom = 720
+                self.player_gravity = 0  # Reset gravity
+
+            # Jump when on the ground
+            if keys[pygame.K_SPACE] and self.player_rect.bottom >= 720:
+                self.player_gravity = -50  # Adjust the jump force as needed
+
+            if keys[pygame.K_RIGHT] and self.player_rect.right <=1280:
+                self.player_rect.x += 10
+                global game_start
+                game_start = False
+
+            if keys[pygame.K_LEFT] and self.player_rect.left >= 0:
+                self.player_rect.x -= 10
+                game_start = False
+
+        else:
+            if keys[pygame.K_SPACE]:
+                self.game_active = True
+                self.monster_rect.left = 1400 # Reset small monster
+                self.monster_2_rect.left = 1400 # Reset big monster
+                self.player_rect.bottom = 720  # Reset player's position
+                self.score = 0
+                game_start = False
+
+  
+    def game_name(self):
+        font = pygame.font.Font(None, 48)
+        self.game_name = font.render("Coin Collector", True, (0,0,0))
+        self.game_name_rect = self.game_name.get_rect(center = (640,100))
+        
+        self.game_message = font.render('Press space to start', True, (0,0,0))
+        self.game_message_rect = self.game_message.get_rect(center = (640,550))
+
+
+    def score_mes(self):
+        font = pygame.font.Font(None, 24)
+        self.score_message = font.render(f'Score: {self.score}', True, (0,0,0))
+        self.score_message_rect = self.score_message.get_rect(center = (1220,25))
+        
+        score_font = pygame.font.Font(None, 48)
+        self.game_score = score_font.render(f'Total score: {self.score}', True, (0,0,0))
+        self.game_score_rect = self.game_score.get_rect(center = (640,550))
+
+    pygame.quit()
+
+
+if __name__ == "__main__":
+    CoinCollector()
